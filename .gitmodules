@@ -1,0 +1,3 @@
+[submodule "UniTask"]
+	path = UniTask
+	url = git@github.com:NewbieGameCoder/UniTask.git
