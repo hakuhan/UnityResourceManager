@@ -1,8 +1,8 @@
 using UnityEngine;
 
-namespace BaiResourceManager
+namespace BaiResourceSystem
 {
-    public class ResourceManagerComponent
+    public class ResourceSystemComponent
     {
         public static string AssetBundle_TargetDirectory_Path = Application.streamingAssetsPath + "/" + "ABFiles";
         public static string AssetBundleDependenciesPath = Application.streamingAssetsPath + "/Dependencies";

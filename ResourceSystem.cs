@@ -12,9 +12,9 @@ using UnityEditor;
 #endif
 
 
-namespace BaiResourceManager
+namespace BaiResourceSystem
 {
-    public class ResourceManager
+    public class ResourceSystem
     {
 #if SYNC_LOAD_BUNDLE
         private string[] m_Variants = { };
@@ -36,7 +36,7 @@ namespace BaiResourceManager
 
         // Asset bundle name dictionary
         Dictionary<string, string> m_assetWithBundle;
-        public ResourceManager()
+        public ResourceSystem()
         {
             ht = new Hashtable();
             m_bundles = new Dictionary<string, AssetBundle>();
@@ -77,11 +77,11 @@ namespace BaiResourceManager
 
             Debug.Log("******AssetBundle打包完成******");
 
-            Debug.Log("将要转移的文件夹是：" + ResourceManagerComponent.AssetBundle_TargetDirectory_Path);
+            Debug.Log("将要转移的文件夹是：" + ResourceSystemComponent.AssetBundle_TargetDirectory_Path);
 
 
             // 删除StreamAsset文件
-            DirectoryInfo streaming_Directory = new DirectoryInfo(ResourceManagerComponent.AssetBundle_TargetDirectory_Path);
+            DirectoryInfo streaming_Directory = new DirectoryInfo(ResourceSystemComponent.AssetBundle_TargetDirectory_Path);
             if (!streaming_Directory.Exists)
             {
                 streaming_Directory.Create();
@@ -94,7 +94,7 @@ namespace BaiResourceManager
             }
 
             // 检查Dependencies
-            DirectoryInfo _dependenciesPath = new DirectoryInfo(ResourceManagerComponent.AssetBundleDependenciesPath);
+            DirectoryInfo _dependenciesPath = new DirectoryInfo(ResourceSystemComponent.AssetBundleDependenciesPath);
             if (!_dependenciesPath.Exists)
             {
                 _dependenciesPath.Create();
@@ -112,9 +112,9 @@ namespace BaiResourceManager
                 // 拷贝Dependencies到StreamAsset
                 if (item.Extension == "")
                 {
-                    item.CopyTo(ResourceManagerComponent.AssetBundleDependenciesPath + "/" + item.Name, true);
+                    item.CopyTo(ResourceSystemComponent.AssetBundleDependenciesPath + "/" + item.Name, true);
                     FileInfo _mFile = new FileInfo(_path + "/" + item.Name + ".manifest");
-                    string _mFileInfo = ResourceManagerComponent.AssetBundleDependenciesPath + "/" + item.Name + ".manifest";
+                    string _mFileInfo = ResourceSystemComponent.AssetBundleDependenciesPath + "/" + item.Name + ".manifest";
                     _mFile.CopyTo(_mFileInfo, true);
                     _mFile.Delete();
                 }
@@ -123,7 +123,7 @@ namespace BaiResourceManager
                     if (item.Name == "AssetBundles.manifest")
                         continue;
 
-                    StringBuilder _pathDuilder = new StringBuilder(ResourceManagerComponent.AssetBundle_TargetDirectory_Path);
+                    StringBuilder _pathDuilder = new StringBuilder(ResourceSystemComponent.AssetBundle_TargetDirectory_Path);
                     _pathDuilder.Append("/");
                     _pathDuilder.Append(item.Name);
                     item.CopyTo(_pathDuilder.ToString(), true);
@@ -264,7 +264,7 @@ namespace BaiResourceManager
         {
             AssetImporter ai = AssetImporter.GetAtPath(path);
             ai.assetBundleName = name;
-            ai.assetBundleVariant = ResourceManagerComponent.AssetBundleVariantName;
+            ai.assetBundleVariant = ResourceSystemComponent.AssetBundleVariantName;
         }
 
         [MenuItem("Tools/清除playerPrefab")]
@@ -289,7 +289,7 @@ namespace BaiResourceManager
                 // 检查是否重复加载
                 if (!m_bundles.ContainsKey(_abName))
                 {
-                    StringBuilder _assetSb = new StringBuilder(ResourceManagerComponent.AssetBundle_TargetDirectory_Path);
+                    StringBuilder _assetSb = new StringBuilder(ResourceSystemComponent.AssetBundle_TargetDirectory_Path);
                     _assetSb.Append("/");
                     _assetSb.Append(_abName);
                     // bunbleName
@@ -313,7 +313,7 @@ namespace BaiResourceManager
                     string[] dependencies = manifest.GetAllDependencies(_sbName);
                     for (int i = 0; i < dependencies.Length; ++i)
                     {
-                        StringBuilder _assetSb = new StringBuilder(ResourceManagerComponent.AssetBundle_TargetDirectory_Path);
+                        StringBuilder _assetSb = new StringBuilder(ResourceSystemComponent.AssetBundle_TargetDirectory_Path);
                         _assetSb.Append("/");
                         _assetSb.Append(dependencies[i]);
 
@@ -326,7 +326,7 @@ namespace BaiResourceManager
                 var bundle = await AssetBundle.LoadFromFileAsync(_fullSBNameWithPath);
 
                 string _name = bundle.name;
-                _name = _name.Remove(_name.Length - ResourceManagerComponent.AssetBundleVariantName.Length - 1);
+                _name = _name.Remove(_name.Length - ResourceSystemComponent.AssetBundleVariantName.Length - 1);
                 m_bundles.Add(_name, bundle);
 
                 Debug.Log("Load assets:" + bundle.name);
@@ -338,8 +338,8 @@ namespace BaiResourceManager
             if (m_manifest == null)
             {
                 AssetBundle manifestAB =
-                    AssetBundle.LoadFromFile(ResourceManagerComponent.AssetBundleDependenciesPath + "/" +
-                                             ResourceManagerComponent.AssetBundleDependenciesName);
+                    AssetBundle.LoadFromFile(ResourceSystemComponent.AssetBundleDependenciesPath + "/" +
+                                             ResourceSystemComponent.AssetBundleDependenciesName);
                 m_manifest = manifestAB.LoadAsset<AssetBundleManifest>("AssetBundleManifest");
                 manifestAB.Unload(false);
             }
@@ -613,7 +613,7 @@ namespace BaiResourceManager
         /// <summary>
         /// 销毁资源
         /// </summary>
-        ~ResourceManager()
+        ~ResourceSystem()
         {
 #if SYNC_LOAD_BUNDLE
             if (shared != null) shared.Unload(true);
