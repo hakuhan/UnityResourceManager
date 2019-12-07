@@ -7,6 +7,7 @@ using UnityEngine;
 using UObject = UnityEngine.Object;
 using UnityEngine.Networking;
 using UniRx.Async;
+using BaiSingleton;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -14,7 +15,7 @@ using UnityEditor;
 
 namespace BaiResourceSystem
 {
-    public class ResourceSystem
+    public class ResourceSystem : MonoSingleton<ResourceSystem>
     {
 #if SYNC_LOAD_BUNDLE
         private string[] m_Variants = { };
@@ -32,14 +33,17 @@ namespace BaiResourceSystem
 
         private Hashtable ht = null; //Resource.load中容器键值对集合
 
+        private List<UniTask> m_loadBundleCoroutines;
+
         AssetBundleManifest m_manifest;
 
         // Asset bundle name dictionary
         Dictionary<string, string> m_assetWithBundle;
-        public ResourceSystem()
+        void Awake()
         {
             ht = new Hashtable();
             m_bundles = new Dictionary<string, AssetBundle>();
+            m_loadBundleCoroutines = new List<UniTask>();
         }
 #if UNITY_EDITOR
         /// <summary>
@@ -278,12 +282,11 @@ namespace BaiResourceSystem
         /// 异步加载文件夹下所有AssetBundle
         /// </summary>
         /// <param name="_assetPath"></param>
-        public async UniTask LoadAllAssetBundle()
+        async public UniTask LoadAllAssetBundle()
         {
             Debug.Log("Bundle: start load bundle");
+            m_loadBundleCoroutines.Clear();
             var _manifest = GetManifest();
-
-            List<UniTask> tasks = new List<UniTask>();
             foreach (var _abName in _manifest.GetAllAssetBundlesWithVariant())
             {
                 // 检查是否重复加载
@@ -292,12 +295,11 @@ namespace BaiResourceSystem
                     StringBuilder _assetSb = new StringBuilder(ResourceSystemComponent.AssetBundle_TargetDirectory_Path);
                     _assetSb.Append("/");
                     _assetSb.Append(_abName);
-                    // bunbleName
-                    tasks.Add(LoadFileAsync(_assetSb.ToString(), _abName));
+                    m_loadBundleCoroutines.Add(LoadFileAsync(_assetSb.ToString(), _abName));
                 }
             }
 
-            await UniTask.WhenAll(tasks.ToArray());
+            await UniTask.WhenAll(m_loadBundleCoroutines.ToArray());
         }
 
         async UniTask LoadFileAsync(string _fullSBNameWithPath, string _sbName)
@@ -317,16 +319,15 @@ namespace BaiResourceSystem
                         _assetSb.Append("/");
                         _assetSb.Append(dependencies[i]);
 
-                        LoadFileAsync(_assetSb.ToString(), dependencies[i]).Forget();
+                        await LoadFileAsync(_assetSb.ToString(), dependencies[i]);
                     }
                 }
 
                 // Load asset
-                Debug.Log("Bundle: loading " + _sbName);
                 var bundle = await AssetBundle.LoadFromFileAsync(_fullSBNameWithPath);
 
                 string _name = bundle.name;
-                _name = _name.Remove(_name.Length - ResourceSystemComponent.AssetBundleVariantName.Length - 1);
+                _name = ResourceSystemUtil.GetBundleNameWithOutPrefix(_name);
                 m_bundles.Add(_name, bundle);
 
                 Debug.Log("Load assets:" + bundle.name);
@@ -402,7 +403,7 @@ namespace BaiResourceSystem
             byte[] stream = null;
             string uri = string.Empty;
             bundles = new Dictionary<string, AssetBundle>();
-            uri = AppConst.DataPath + AppConst.AssetDir;
+            uri = ResourceSystemComponent.DataPath + ResourceSystemComponent.AssetDir;
             if (!File.Exists(uri)) return;
             stream = File.ReadAllBytes(uri);
             assetbundle = AssetBundle.LoadFromMemory(stream);
@@ -453,9 +454,9 @@ namespace BaiResourceSystem
         /// <returns></returns>
         public AssetBundle LoadAssetBundle(string abname)
         {
-            if (!abname.EndsWith(AppConst.ExtName))
+            if (!abname.EndsWith(ResourceSystemComponent.ExtName))
             {
-                abname += AppConst.ExtName;
+                abname += ResourceSystemComponent.ExtName;
             }
             AssetBundle bundle = null;
             if (!bundles.ContainsKey(abname))
@@ -613,7 +614,7 @@ namespace BaiResourceSystem
         /// <summary>
         /// 销毁资源
         /// </summary>
-        ~ResourceSystem()
+        new void OnDestroy()
         {
 #if SYNC_LOAD_BUNDLE
             if (shared != null) shared.Unload(true);
@@ -638,13 +639,26 @@ namespace BaiResourceSystem
         /// </summary>
         /// <param name="path"></param>
         /// <param name="callback"></param>
-        public async UniTask ReadCSVDataAsync(string path, Action<string> callback)
+        public void ReadCSVData(string path, Action<string> callback)
         {
-            // TODO Check file
-            await ReadCSVCoroutine(path, (string _data) =>
-                    {
-                        callback(_data);
-                    });
+            // Start coroutine
+            GameObject _obj = new GameObject("ReadCSVTool");
+            // StartCoroutine(Util.Utils.CheckPath(path, (bool exists) =>
+            // {
+            //     if (exists)
+            //     {
+            //         _mono.StartCoroutine(ReadCSVCoroutine(path, (string _data) =>
+            //         {
+            //             callback(_data);
+            //             Destroy(_mono.gameObject);
+            //         }));
+            //     }
+            //     else
+            //     {
+            //         Destroy(_mono.gameObject);
+            //         Debug.Log("File not exists :" + path);
+            //     }
+            // }));
         }
 
         static IEnumerator ReadCSVCoroutine(string path, Action<string> callback)
@@ -666,7 +680,7 @@ namespace BaiResourceSystem
         /// Loads the assets bundle for web.
         /// </summary>
         /// <param name="url">URL.</param>
-        public async UniTask LoadAssetsBundleForWeb(string url, Action<AssetBundle> callback)
+        async public UniTask LoadAssetsBundleForWeb(string url, Action<AssetBundle> callback)
         {
             await LoadWebAssetsBundleCoroutine(url, callback);
         }
@@ -691,61 +705,6 @@ namespace BaiResourceSystem
             {
                 callback(DownloadHandlerAssetBundle.GetContent(_request));
             }
-        }
-
-        /// <summary>
-        /// Move file to path
-        /// </summary>
-        /// <param name="origin"></param>
-        /// <param name="target"></param>
-        public void MoveFile(string origin, string target)
-        {
-            FileInfo _originFile = new FileInfo(origin);
-            if (_originFile.Exists)
-            {
-                FileInfo _targetFile = new FileInfo(target);
-                if (_targetFile.Exists)
-                    _targetFile.Delete();
-
-                _originFile.CopyTo(target);
-            }
-            else
-            {
-                Debug.Log(origin + " not exist!");
-            }
-        }
-
-        /// <summary>
-        /// 下载bytes协程
-        /// </summary>
-        /// <param name="path"></param>
-        /// <param name="destination"></param>
-        /// <param name="callback"></param>
-        /// <param name="isloadFromWeb"></param>
-        /// <returns></returns>
-        public IEnumerator LoadBytsCoroutine(string path, Action<bool, byte[]> callback)
-        {
-            var _url = path;
-
-            var _request = new UnityWebRequest(_url);
-
-            DownloadHandlerBuffer _handler = new DownloadHandlerBuffer();
-            _request.downloadHandler = _handler;
-
-            // 请求
-            yield return _request.SendWebRequest();
-
-            bool _result = false;
-            if (_request.isDone && _request.error == null)
-            {
-                _result = true;
-            }
-            else
-            {
-                _request.Dispose();
-            }
-
-            callback(_result, _handler.data);
         }
 
         string GetUrl(string url)
