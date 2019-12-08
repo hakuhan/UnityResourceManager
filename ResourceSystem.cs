@@ -15,7 +15,7 @@ using UnityEditor;
 
 namespace BaiResourceSystem
 {
-    public class ResourceSystem : MonoSingleton<ResourceSystem>
+    public class ResourceSystem
     {
 #if SYNC_LOAD_BUNDLE
         private string[] m_Variants = { };
@@ -39,7 +39,7 @@ namespace BaiResourceSystem
 
         // Asset bundle name dictionary
         Dictionary<string, string> m_assetWithBundle;
-        void Awake()
+        public ResourceSystem()
         {
             ht = new Hashtable();
             m_bundles = new Dictionary<string, AssetBundle>();
@@ -605,7 +605,6 @@ namespace BaiResourceSystem
                 Debug.LogError(GetType() + "/LoadAsset()/克隆资源不成功，请检查。 path=" + path);
             }
 
-            //goObj = null;//??????????
             return goObjClone;
         }
 
@@ -614,7 +613,7 @@ namespace BaiResourceSystem
         /// <summary>
         /// 销毁资源
         /// </summary>
-        new void OnDestroy()
+        ~ResourceSystem()
         {
 #if SYNC_LOAD_BUNDLE
             if (shared != null) shared.Unload(true);
@@ -635,76 +634,22 @@ namespace BaiResourceSystem
         }
 
         /// <summary>
-        /// read csv with path to string
-        /// </summary>
-        /// <param name="path"></param>
-        /// <param name="callback"></param>
-        public void ReadCSVData(string path, Action<string> callback)
-        {
-            // Start coroutine
-            GameObject _obj = new GameObject("ReadCSVTool");
-            // StartCoroutine(Util.Utils.CheckPath(path, (bool exists) =>
-            // {
-            //     if (exists)
-            //     {
-            //         _mono.StartCoroutine(ReadCSVCoroutine(path, (string _data) =>
-            //         {
-            //             callback(_data);
-            //             Destroy(_mono.gameObject);
-            //         }));
-            //     }
-            //     else
-            //     {
-            //         Destroy(_mono.gameObject);
-            //         Debug.Log("File not exists :" + path);
-            //     }
-            // }));
-        }
-
-        static IEnumerator ReadCSVCoroutine(string path, Action<string> callback)
-        {
-            var _request = UnityWebRequest.Get(path);
-            yield return _request.SendWebRequest();
-            if (_request.isNetworkError || _request.isHttpError)
-            {
-                _request.Dispose();
-                callback(string.Empty);
-            }
-            else
-            {
-                callback(_request.downloadHandler.text);
-            }
-        }
-
-        /// <summary>
         /// Loads the assets bundle for web.
         /// </summary>
         /// <param name="url">URL.</param>
-        async public UniTask LoadAssetsBundleForWeb(string url, Action<AssetBundle> callback)
-        {
-            await LoadWebAssetsBundleCoroutine(url, callback);
-        }
-
-        IEnumerator LoadWebAssetsBundleCoroutine(string url, Action<AssetBundle> callback, bool isLocal = false)
+        async UniTask<AssetBundle> LoadWebAssetsBundleAsync(string url, bool isLocal = false)
         {
             // Load bundle 
             var _url = url;
             if (isLocal)
+            {
                 _url = GetUrl(url);
+            }
 
             // Get Image
-            UnityWebRequest _request = UnityWebRequestAssetBundle.GetAssetBundle(_url);
+            var op = await UnityWebRequestAssetBundle.GetAssetBundle(_url).SendWebRequest();
 
-            yield return _request.SendWebRequest();
-            if (_request.isNetworkError || _request.isHttpError)
-            {
-                Debug.Log(_request.error);
-                _request.Dispose();
-            }
-            else
-            {
-                callback(DownloadHandlerAssetBundle.GetContent(_request));
-            }
+            return DownloadHandlerAssetBundle.GetContent(op);
         }
 
         string GetUrl(string url)
